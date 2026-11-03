@@ -1,69 +1,105 @@
-import Image from "next/image";
+import Link from "next/link";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { db } from "@/db";
+import { articles, dailyLog, topicMastery, topics } from "@/db/schema";
+import { CATEGORIES, today } from "@/lib/utils";
+import FeedRefreshButton from "./feed-refresh-button";
+import { setArticleStatus, startSession } from "./actions";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+function weakest(domainIds: string[]) {
+  const rows = db.select({
+    id: topics.id, name: topics.name, domain: topics.domainId,
+    attempts: topicMastery.totalAttempts, correct: topicMastery.correctAttempts,
+  }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId))
+    .where(inArray(topics.domainId, domainIds)).all();
+  const score = (r: (typeof rows)[number]) => (r.attempts ? (r.correct ?? 0) / r.attempts : -1); // untouched topics first
+  return rows.sort((a, b) => score(a) - score(b))[0];
+}
+
+function RecCard({ title, topic, label }: { title: string; topic?: ReturnType<typeof weakest>; label: string }) {
+  if (!topic) return null;
+  const acc = topic.attempts ? `${Math.round(((topic.correct ?? 0) / topic.attempts) * 100)}% accuracy` : "Not practiced yet";
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <form action={startSession} className="card flex items-center justify-between gap-4">
+      <input type="hidden" name="domain" value={topic.domain} />
+      <input type="hidden" name="topic" value={topic.id} />
+      <input type="hidden" name="n" value="5" />
+      <div>
+        <p className="text-sm text-muted">{title}</p>
+        <p className="font-serif text-lg">{topic.name}</p>
+        <p className="text-sm text-muted">{acc}</p>
+      </div>
+      <button className="btn btn-primary">{label}</button>
+    </form>
+  );
+}
+
+export default function Dashboard() {
+  const last = db.select().from(dailyLog).orderBy(dailyLog.date).all().at(-1);
+  const gapDays = last ? Math.floor((Date.parse(today()) - Date.parse(last.date)) / 86400000) : 0;
+
+  const feed = CATEGORIES.map(([key, label]) => ({
+    key, label,
+    article: db.select().from(articles)
+      .where(and(eq(articles.category, key), inArray(articles.status, ["unread", "reading"])))
+      .orderBy(desc(articles.discoveredAt), desc(articles.id)).limit(1).get(),
+  }));
+  const saved = db.select().from(articles).where(eq(articles.status, "saved")).all();
+  const qa = weakest(["qa"]);
+  const other = weakest(["dilr", "varc"]);
+
+  return (
+    <div className="space-y-10">
+      <header>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-3xl">{gapDays >= 3 ? "Welcome back." : "Today"}</h1>
+            <p className="mt-1 text-muted">
+              {gapDays >= 3 ? "Here is your balanced plan for today." : "Five articles, one from each lane, and two practice sets chosen from your weakest topics."}
+            </p>
+          </div>
+          <FeedRefreshButton />
+        </div>
+      </header>
+
+      <section aria-labelledby="reading" className="space-y-3">
+        <h2 id="reading" className="font-serif text-xl">Reading</h2>
+        {feed.map(({ key, label, article }) => (
+          <article key={key} className="card">
+            <p className="text-sm text-muted">{label}</p>
+            {article ? (
+              <>
+                <h3 className="mt-1 font-serif text-lg">{article.title}</h3>
+                <p className="text-sm text-muted">{article.sourceName} · {article.readingTimeMin} min read</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href={`/read/${article.id}`} className="btn btn-primary">Read now</Link>
+                  <form action={setArticleStatus.bind(null, article.id, "saved")}><button className="btn">Save for later</button></form>
+                  <form action={setArticleStatus.bind(null, article.id, "skipped")}><button className="btn">Skip</button></form>
+                  <form action={setArticleStatus.bind(null, article.id, "completed")}><button className="btn">Mark completed</button></form>
+                </div>
+              </>
+            ) : (
+              <p className="mt-1 text-muted">No unread articles in this lane. New ones arrive when feed refresh ships in Phase 2.</p>
+            )}
+          </article>
+        ))}
+        {saved.length > 0 && (
+          <p className="text-sm text-muted">
+            Saved for later:{" "}
+            {saved.map((s, i) => (
+              <span key={s.id}>{i > 0 && ", "}<Link className="underline" href={`/read/${s.id}`}>{s.title}</Link></span>
+            ))}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        )}
+      </section>
+
+      <section aria-labelledby="practice" className="space-y-3">
+        <h2 id="practice" className="font-serif text-xl">Recommended practice</h2>
+        <RecCard title="Quant set · 5 questions" topic={qa} label="Start set" />
+        <RecCard title="DILR / VARC set · 5 questions" topic={other} label="Start set" />
+      </section>
     </div>
   );
 }
