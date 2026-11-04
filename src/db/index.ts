@@ -15,6 +15,11 @@ const client = postgres(connectionString ?? "postgres://build:build@localhost:54
   connect_timeout: 10,
   queue_timeout: 5,
   idle_timeout: 20,
+  connection: {
+    statement_timeout: 10000,
+    lock_timeout: 5000,
+    idle_in_transaction_session_timeout: 10000,
+  },
 });
 const database = drizzle(client, { schema });
 let initialization: Promise<void> | undefined;
