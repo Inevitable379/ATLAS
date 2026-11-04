@@ -1,3 +1,4 @@
-// Opening the DB creates tables and seeds an empty database.
-import "../src/db";
+import { ensureDatabase } from "../src/db";
+
+await ensureDatabase();
 console.log("ATLAS database ready (Supabase PostgreSQL).");

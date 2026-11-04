@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { articles, attempts, practiceSessions, questions, topicMastery, vocabulary, preferences } from "@/db/schema";
 import {
   checkGemini,
@@ -35,11 +35,13 @@ async function bumpLog(col: LogCol, n: number) {
 
 /* ---------- Articles ---------- */
 export async function openArticle(id: number) {
+  await ensureDatabase();
   await db.update(articles).set({ status: "reading", openedAt: sql`CURRENT_TIMESTAMP` })
     .where(and(eq(articles.id, id), inArray(articles.status, ["unread", "saved", "reading"])));
 }
 
 export async function addReadingTime(id: number, seconds: number) {
+  await ensureDatabase();
   const s = Math.max(0, Math.min(Math.round(seconds), 600));
   if (!s) return;
   await db.update(articles).set({ timeSpentS: sql`${articles.timeSpentS} + ${s}` }).where(eq(articles.id, id));
@@ -47,6 +49,7 @@ export async function addReadingTime(id: number, seconds: number) {
 }
 
 export async function setArticleStatus(id: number, status: "saved" | "skipped" | "completed" | "unread") {
+  await ensureDatabase();
   const previous = await db.select({ s: articles.status }).from(articles).where(eq(articles.id, id)).limit(1);
   await db.update(articles).set({
     status,
@@ -57,6 +60,7 @@ export async function setArticleStatus(id: number, status: "saved" | "skipped" |
 }
 
 export async function saveManualContent(id: number, text: string) {
+  await ensureDatabase();
   const clean = text.trim();
   if (!clean) return;
   await db.update(articles).set({
@@ -66,6 +70,7 @@ export async function saveManualContent(id: number, text: string) {
 }
 
 export async function refreshFeeds() {
+  await ensureDatabase();
   const result = await refreshFeedSources();
   revalidatePath("/");
   revalidatePath("/archive");
@@ -73,6 +78,7 @@ export async function refreshFeeds() {
 }
 
 export async function generateArticleSummary(articleId: number) {
+  await ensureDatabase();
   const rows = await db.select({ content: articles.content, summary: articles.summary })
     .from(articles).where(eq(articles.id, articleId)).limit(1);
   const article = rows[0];
@@ -86,6 +92,7 @@ export async function generateArticleSummary(articleId: number) {
 }
 
 export async function generateGeminiArticleSummary(articleId: number) {
+  await ensureDatabase();
   const rows = await db.select({ content: articles.content, summary: articles.summary })
     .from(articles).where(eq(articles.id, articleId)).limit(1);
   const article = rows[0];
@@ -98,6 +105,7 @@ export async function generateGeminiArticleSummary(articleId: number) {
 }
 
 export async function generateGeminiQuestions(articleId: number) {
+  await ensureDatabase();
   const rows = await db.select({ content: articles.content }).from(articles)
     .where(eq(articles.id, articleId)).limit(1);
   const article = rows[0];
@@ -120,6 +128,7 @@ function isGeneratedQuestion(value: unknown): value is GeneratedCatQuestion {
 }
 
 export async function saveGeneratedQuestions(articleId: number, generated: unknown) {
+  await ensureDatabase();
   const rows = await db.select({ content: articles.content }).from(articles)
     .where(eq(articles.id, articleId)).limit(1);
   const article = rows[0];
@@ -146,6 +155,7 @@ export async function saveGeneratedQuestions(articleId: number, generated: unkno
 }
 
 export async function generateVocabularyDefinition(word: string, context: string) {
+  await ensureDatabase();
   return defineVocabulary(word, context, await configuredAiModel());
 }
 
@@ -154,6 +164,7 @@ export async function generateGeminiVocabularyDefinition(word: string, context: 
 }
 
 export async function checkLocalAi() {
+  await ensureDatabase();
   return checkOllama(await configuredAiModel());
 }
 
@@ -162,6 +173,7 @@ export async function checkGeminiAi() {
 }
 
 export async function saveAiSettings(formData: FormData) {
+  await ensureDatabase();
   const model = String(formData.get("model") ?? "").trim().slice(0, 100);
   if (!model) throw new Error("An Ollama model name is required.");
   await db.insert(preferences).values({ key: "ollama_model", value: model })
@@ -171,6 +183,7 @@ export async function saveAiSettings(formData: FormData) {
 
 /* ---------- Vocabulary ---------- */
 export async function saveVocab(input: { word: string; meaning: string; context: string; articleId: number }) {
+  await ensureDatabase();
   const word = input.word.trim().slice(0, 80);
   if (!word) throw new Error("A vocabulary word is required.");
   await db.insert(vocabulary).values({
@@ -182,6 +195,7 @@ export async function saveVocab(input: { word: string; meaning: string; context:
 }
 
 export async function reviewVocabulary(id: number, rating: "forgot" | "hard" | "good" | "easy") {
+  await ensureDatabase();
   const rows = await db.select().from(vocabulary).where(eq(vocabulary.id, id)).limit(1);
   const word = rows[0];
   if (!word) throw new Error("Vocabulary card not found.");
@@ -214,6 +228,7 @@ export async function reviewVocabulary(id: number, rating: "forgot" | "hard" | "
 
 /* ---------- Practice ---------- */
 export async function startSession(formData: FormData) {
+  await ensureDatabase();
   const domain = String(formData.get("domain"));
   const topic = String(formData.get("topic") ?? "") || null;
   const requested = Number(formData.get("n") ?? 5);
@@ -234,6 +249,7 @@ export async function startSession(formData: FormData) {
 export async function submitAttempt(input: {
   questionId: number; sessionId: number; answer: string; timeSpent: number; confidence: number | null;
 }) {
+  await ensureDatabase();
   const questionRows = await db.select().from(questions).where(eq(questions.id, input.questionId)).limit(1);
   const q = questionRows[0];
   if (!q) throw new Error("Question not found");
@@ -292,11 +308,13 @@ export async function submitAttempt(input: {
 }
 
 export async function tagMistake(attemptId: number, type: string) {
+  await ensureDatabase();
   if (!["conceptual", "careless", "misread", "time_pressure"].includes(type)) return;
   await db.update(attempts).set({ mistakeType: type }).where(eq(attempts.id, attemptId));
 }
 
 export async function finishSession(sessionId: number) {
+  await ensureDatabase();
   await db.update(practiceSessions).set({ completedAt: sql`CURRENT_TIMESTAMP` })
     .where(and(eq(practiceSessions.id, sessionId), sql`${practiceSessions.completedAt} IS NULL`));
   revalidatePath("/progress");

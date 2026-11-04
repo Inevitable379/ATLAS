@@ -1,9 +1,10 @@
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import * as schema from "@/db/schema";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  await ensureDatabase();
   const [
     domains, topics, articles, questions, practiceSessions, attempts, topicMastery,
     vocabulary, summaries, rssSources, dailyLog, preferences, automationRuns,

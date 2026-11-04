@@ -1,6 +1,6 @@
 import { loadEnvConfig } from "@next/env";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "../src/db";
+import { db, ensureDatabase } from "../src/db";
 import { articles, automationRuns, attempts, questions, topics } from "../src/db/schema";
 import { generatePracticeQuestionsWithGemini, type GeneratedPracticeQuestion } from "../src/lib/ai";
 import { refreshFeeds } from "../src/lib/feeds";
@@ -86,6 +86,7 @@ async function addQuestions(topic: typeof topics.$inferSelect, generated: Genera
 }
 
 async function main() {
+  await ensureDatabase();
   if (dryRun) {
     const allTopics = await db.select().from(topics);
     const topicsToRefresh = [];

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { articles, dailyLog, topicMastery, topics } from "@/db/schema";
 import { CATEGORIES, today } from "@/lib/utils";
 import FeedRefreshButton from "./feed-refresh-button";
@@ -45,6 +45,7 @@ function RecCard({ title, topic, label }: { title: string; topic?: WeakTopic; la
 }
 
 export default async function Dashboard() {
+  await ensureDatabase();
   const dailyRows = await db.select().from(dailyLog).orderBy(dailyLog.date);
   const last = dailyRows.at(-1);
   const gapDays = last ? Math.floor((Date.parse(today()) - Date.parse(last.date)) / 86400000) : 0;

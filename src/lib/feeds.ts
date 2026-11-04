@@ -2,7 +2,7 @@ import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 import Parser from "rss-parser";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { articles, rssSources } from "@/db/schema";
 
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -130,6 +130,7 @@ async function refreshSource(source: typeof rssSources.$inferSelect): Promise<Fe
 }
 
 export async function refreshFeeds(): Promise<FeedRefreshResult> {
+  await ensureDatabase();
   const sources = await db.select().from(rssSources).where(eq(rssSources.isActive, 1));
   const results = await Promise.all(sources.map(async (source) => {
     try {

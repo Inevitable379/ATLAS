@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { inArray } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { questions } from "@/db/schema";
 import SessionClient from "./session-client";
 
@@ -13,6 +13,7 @@ export default async function SessionPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ q?: string | string[] }>;
 }) {
+  await ensureDatabase();
   const [{ id: rawId }, query] = await Promise.all([params, searchParams]);
   const rawQuestionIds = Array.isArray(query.q) ? query.q[0] : query.q;
   const ids = (rawQuestionIds ?? "").split(",").map(Number).filter(Boolean);

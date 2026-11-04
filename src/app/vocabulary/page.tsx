@@ -1,5 +1,5 @@
 import { desc } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { vocabulary } from "@/db/schema";
 import { today } from "@/lib/utils";
 import ReviewClient from "./review-client";
@@ -7,6 +7,7 @@ import ReviewClient from "./review-client";
 export const dynamic = "force-dynamic";
 
 export default async function Vocabulary() {
+  await ensureDatabase();
   const words = await db.select().from(vocabulary).orderBy(desc(vocabulary.id));
   const due = words.filter((word) => !word.nextReviewDate || word.nextReviewDate <= today());
   const cards = due.map((word) => ({

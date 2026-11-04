@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { preferences } from "@/db/schema";
 import { defaultAiModel, defaultGeminiModel } from "@/lib/ai";
 import { saveAiSettings } from "../actions";
@@ -8,6 +8,7 @@ import AiHealthCheck from "./ai-health-check";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  await ensureDatabase();
   const modelRows = await db.select({ value: preferences.value }).from(preferences)
     .where(eq(preferences.key, "ollama_model")).orderBy(desc(preferences.key)).limit(1);
   const model = modelRows[0]?.value ?? defaultAiModel();

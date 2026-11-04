@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, desc, eq, like } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { articles } from "@/db/schema";
 import { CATEGORIES } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ function first(value: string | string[] | undefined) {
 }
 
 export default async function Archive({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await ensureDatabase();
   const query = await searchParams;
   const search = first(query.q)?.trim().slice(0, 100) ?? "";
   const category = first(query.category) ?? "";

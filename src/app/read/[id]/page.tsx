@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { articles } from "@/db/schema";
 import ReaderClient from "./reader-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReadPage({ params }: { params: Promise<{ id: string }> }) {
+  await ensureDatabase();
   const { id: rawId } = await params;
   const id = Number(rawId);
   const a = Number.isFinite(id)

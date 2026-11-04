@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { domains, topicMastery, topics } from "@/db/schema";
 import { MISTAKES, pct } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ function Bar({ value, label, detail }: { value: number; label: string; detail: s
 }
 
 export default async function Progress() {
+  await ensureDatabase();
   const doms = await db.select().from(domains).orderBy(domains.sortOrder);
   const acc = await db.execute<{ domain: string; n: number; c: number; t: number }>(sql`
     SELECT q.domain_id AS domain, COUNT(*) AS n, SUM(a.is_correct) AS c, SUM(a.time_spent_s) AS t

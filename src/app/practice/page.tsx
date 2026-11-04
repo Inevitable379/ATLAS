@@ -1,11 +1,12 @@
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureDatabase } from "@/db";
 import { domains, topicMastery, topics } from "@/db/schema";
 import { startSession } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function PracticeHub() {
+  await ensureDatabase();
   const doms = await db.select().from(domains).orderBy(domains.sortOrder);
   const rows = await db.select({
     id: topics.id, name: topics.name, domain: topics.domainId, level: topicMastery.masteryLevel,
