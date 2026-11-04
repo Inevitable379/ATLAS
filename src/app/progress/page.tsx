@@ -16,22 +16,22 @@ function Bar({ value, label, detail }: { value: number; label: string; detail: s
   );
 }
 
-export default function Progress() {
-  const doms = db.select().from(domains).orderBy(domains.sortOrder).all();
-  const acc = db.all<{ domain: string; n: number; c: number; t: number }>(sql`
+export default async function Progress() {
+  const doms = await db.select().from(domains).orderBy(domains.sortOrder);
+  const acc = await db.execute<{ domain: string; n: number; c: number; t: number }>(sql`
     SELECT q.domain_id AS domain, COUNT(*) AS n, SUM(a.is_correct) AS c, SUM(a.time_spent_s) AS t
     FROM attempts a JOIN questions q ON q.id = a.question_id GROUP BY q.domain_id`);
-  const errs = db.all<{ domain: string; type: string; n: number }>(sql`
+  const errs = await db.execute<{ domain: string; type: string; n: number }>(sql`
     SELECT q.domain_id AS domain, COALESCE(a.mistake_type, 'untagged') AS type, COUNT(*) AS n
     FROM attempts a JOIN questions q ON q.id = a.question_id WHERE a.is_correct = 0 GROUP BY 1, 2`);
-  const calibration = db.all<{ band: string; outcome: string; n: number }>(sql`
+  const calibration = await db.execute<{ band: string; outcome: string; n: number }>(sql`
     SELECT CASE WHEN a.confidence >= 4 THEN 'High confidence' ELSE 'Low confidence' END AS band,
       CASE WHEN a.is_correct = 1 THEN 'Correct' ELSE 'Incorrect' END AS outcome, COUNT(*) AS n
     FROM attempts a WHERE a.confidence IS NOT NULL GROUP BY 1, 2`);
-  const mastery = db.select({
+  const mastery = await db.select({
     name: topics.name, domain: topics.domainId, level: topicMastery.masteryLevel,
     total: topicMastery.totalAttempts, correct: topicMastery.correctAttempts, avg: topicMastery.avgTimeS,
-  }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId)).orderBy(topics.domainId, topics.sortOrder).all();
+  }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId)).orderBy(topics.domainId, topics.sortOrder);
   const label = (t: string) => MISTAKES.find((m) => m.id === t)?.label ?? "Not tagged";
 
   return (

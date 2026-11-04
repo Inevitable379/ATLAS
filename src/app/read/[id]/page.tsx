@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function ReadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;
   const id = Number(rawId);
-  const a = Number.isFinite(id) ? db.select().from(articles).where(eq(articles.id, id)).get() : undefined;
+  const a = Number.isFinite(id)
+    ? (await db.select().from(articles).where(eq(articles.id, id)).limit(1))[0]
+    : undefined;
   if (!a) notFound();
   return (
     <div>

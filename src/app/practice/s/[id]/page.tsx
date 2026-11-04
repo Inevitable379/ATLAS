@@ -17,7 +17,7 @@ export default async function SessionPage({
   const rawQuestionIds = Array.isArray(query.q) ? query.q[0] : query.q;
   const ids = (rawQuestionIds ?? "").split(",").map(Number).filter(Boolean);
   if (!ids.length) notFound();
-  const rows = db.select().from(questions).where(inArray(questions.id, ids)).all();
+  const rows = await db.select().from(questions).where(inArray(questions.id, ids));
   const ordered = ids.map((i) => rows.find((r) => r.id === i)).filter((r): r is NonNullable<typeof r> => !!r);
   // Answers and explanations stay on the server until an attempt is submitted.
   const qs = ordered.map((q) => ({

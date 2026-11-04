@@ -8,17 +8,25 @@ import { setArticleStatus, startSession } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-function weakest(domainIds: string[]) {
-  const rows = db.select({
+type WeakTopic = {
+  id: string;
+  name: string;
+  domain: string;
+  attempts: number | null;
+  correct: number | null;
+};
+
+async function weakest(domainIds: string[]) {
+  const rows = await db.select({
     id: topics.id, name: topics.name, domain: topics.domainId,
     attempts: topicMastery.totalAttempts, correct: topicMastery.correctAttempts,
   }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId))
-    .where(inArray(topics.domainId, domainIds)).all();
+    .where(inArray(topics.domainId, domainIds));
   const score = (r: (typeof rows)[number]) => (r.attempts ? (r.correct ?? 0) / r.attempts : -1); // untouched topics first
   return rows.sort((a, b) => score(a) - score(b))[0];
 }
 
-function RecCard({ title, topic, label }: { title: string; topic?: ReturnType<typeof weakest>; label: string }) {
+function RecCard({ title, topic, label }: { title: string; topic?: WeakTopic; label: string }) {
   if (!topic) return null;
   const acc = topic.attempts ? `${Math.round(((topic.correct ?? 0) / topic.attempts) * 100)}% accuracy` : "Not practiced yet";
   return (
@@ -36,19 +44,20 @@ function RecCard({ title, topic, label }: { title: string; topic?: ReturnType<ty
   );
 }
 
-export default function Dashboard() {
-  const last = db.select().from(dailyLog).orderBy(dailyLog.date).all().at(-1);
+export default async function Dashboard() {
+  const dailyRows = await db.select().from(dailyLog).orderBy(dailyLog.date);
+  const last = dailyRows.at(-1);
   const gapDays = last ? Math.floor((Date.parse(today()) - Date.parse(last.date)) / 86400000) : 0;
 
-  const feed = CATEGORIES.map(([key, label]) => ({
+  const feed = await Promise.all(CATEGORIES.map(async ([key, label]) => ({
     key, label,
-    article: db.select().from(articles)
+    article: (await db.select().from(articles)
       .where(and(eq(articles.category, key), inArray(articles.status, ["unread", "reading"])))
-      .orderBy(desc(articles.discoveredAt), desc(articles.id)).limit(1).get(),
-  }));
-  const saved = db.select().from(articles).where(eq(articles.status, "saved")).all();
-  const qa = weakest(["qa"]);
-  const other = weakest(["dilr", "varc"]);
+      .orderBy(desc(articles.discoveredAt), desc(articles.id)).limit(1))[0],
+  })));
+  const saved = await db.select().from(articles).where(eq(articles.status, "saved"));
+  const qa = await weakest(["qa"]);
+  const other = await weakest(["dilr", "varc"]);
 
   return (
     <div className="space-y-10">

@@ -7,9 +7,10 @@ import AiHealthCheck from "./ai-health-check";
 
 export const dynamic = "force-dynamic";
 
-export default function SettingsPage() {
-  const model = db.select({ value: preferences.value }).from(preferences)
-    .where(eq(preferences.key, "ollama_model")).orderBy(desc(preferences.key)).get()?.value ?? defaultAiModel();
+export default async function SettingsPage() {
+  const modelRows = await db.select({ value: preferences.value }).from(preferences)
+    .where(eq(preferences.key, "ollama_model")).orderBy(desc(preferences.key)).limit(1);
+  const model = modelRows[0]?.value ?? defaultAiModel();
   const geminiConfigured = Boolean(process.env.GEMINI_API_KEY?.trim());
 
   return (
@@ -52,8 +53,8 @@ export default function SettingsPage() {
 
       <section className="card space-y-3">
         <h2 className="font-serif text-xl">Data backup</h2>
-        <p className="text-sm text-muted">Download a copy of your local SQLite database. Stop the app before copying the file manually.</p>
-        <a className="btn" href="/api/backup">Download atlas.db</a>
+        <p className="text-sm text-muted">Download a JSON copy of your ATLAS data from Supabase.</p>
+        <a className="btn" href="/api/backup">Download ATLAS backup</a>
       </section>
     </div>
   );

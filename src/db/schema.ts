@@ -1,16 +1,16 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { integer, pgTable, real, serial, text } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-const now = sql`(datetime('now'))`;
+const now = sql`CURRENT_TIMESTAMP`;
 
-export const domains = sqliteTable("domains", {
+export const domains = pgTable("domains", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   icon: text("icon"),
   sortOrder: integer("sort_order").default(0),
 });
 
-export const topics = sqliteTable("topics", {
+export const topics = pgTable("topics", {
   id: text("id").primaryKey(),
   domainId: text("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -18,8 +18,8 @@ export const topics = sqliteTable("topics", {
   sortOrder: integer("sort_order").default(0),
 });
 
-export const articles = sqliteTable("articles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const articles = pgTable("articles", {
+  id: serial("id").primaryKey(),
   title: text("title").notNull(),
   url: text("url").notNull().unique(),
   sourceName: text("source_name").notNull(),
@@ -35,8 +35,8 @@ export const articles = sqliteTable("articles", {
   timeSpentS: integer("time_spent_s").default(0),
 });
 
-export const questions = sqliteTable("questions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const questions = pgTable("questions", {
+  id: serial("id").primaryKey(),
   domainId: text("domain_id").notNull().references(() => domains.id),
   topicId: text("topic_id").references(() => topics.id),
   articleId: integer("article_id").references(() => articles.id),
@@ -52,8 +52,8 @@ export const questions = sqliteTable("questions", {
   createdAt: text("created_at").default(now),
 });
 
-export const practiceSessions = sqliteTable("practice_sessions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const practiceSessions = pgTable("practice_sessions", {
+  id: serial("id").primaryKey(),
   domainId: text("domain_id").notNull().references(() => domains.id),
   topicId: text("topic_id").references(() => topics.id),
   totalQuestions: integer("total_questions").default(0),
@@ -63,8 +63,8 @@ export const practiceSessions = sqliteTable("practice_sessions", {
   completedAt: text("completed_at"),
 });
 
-export const attempts = sqliteTable("attempts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const attempts = pgTable("attempts", {
+  id: serial("id").primaryKey(),
   questionId: integer("question_id").notNull().references(() => questions.id),
   sessionId: integer("session_id").references(() => practiceSessions.id),
   userAnswer: text("user_answer").notNull(),
@@ -75,7 +75,7 @@ export const attempts = sqliteTable("attempts", {
   attemptedAt: text("attempted_at").default(now),
 });
 
-export const topicMastery = sqliteTable("topic_mastery", {
+export const topicMastery = pgTable("topic_mastery", {
   topicId: text("topic_id").primaryKey().references(() => topics.id),
   totalAttempts: integer("total_attempts").default(0),
   correctAttempts: integer("correct_attempts").default(0),
@@ -87,8 +87,8 @@ export const topicMastery = sqliteTable("topic_mastery", {
   updatedAt: text("updated_at").default(now),
 });
 
-export const vocabulary = sqliteTable("vocabulary", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const vocabulary = pgTable("vocabulary", {
+  id: serial("id").primaryKey(),
   word: text("word").notNull(),
   meaning: text("meaning").notNull(),
   contextSentence: text("context_sentence"),
@@ -101,8 +101,8 @@ export const vocabulary = sqliteTable("vocabulary", {
   createdAt: text("created_at").default(now),
 });
 
-export const summaries = sqliteTable("summaries", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const summaries = pgTable("summaries", {
+  id: serial("id").primaryKey(),
   articleId: integer("article_id").notNull().references(() => articles.id),
   userSummary: text("user_summary").notNull(),
   aiFeedback: text("ai_feedback"),
@@ -110,8 +110,8 @@ export const summaries = sqliteTable("summaries", {
   createdAt: text("created_at").default(now),
 });
 
-export const rssSources = sqliteTable("rss_sources", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const rssSources = pgTable("rss_sources", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   url: text("url").notNull().unique(),
   category: text("category").notNull(),
@@ -119,7 +119,7 @@ export const rssSources = sqliteTable("rss_sources", {
   lastFetched: text("last_fetched"),
 });
 
-export const dailyLog = sqliteTable("daily_log", {
+export const dailyLog = pgTable("daily_log", {
   date: text("date").primaryKey(),
   articlesRead: integer("articles_read").default(0),
   questionsAttempted: integer("questions_attempted").default(0),
@@ -130,13 +130,13 @@ export const dailyLog = sqliteTable("daily_log", {
   summariesWritten: integer("summaries_written").default(0),
 });
 
-export const preferences = sqliteTable("preferences", {
+export const preferences = pgTable("preferences", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
 
-export const automationRuns = sqliteTable("automation_runs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const automationRuns = pgTable("automation_runs", {
+  id: serial("id").primaryKey(),
   status: text("status").notNull(),
   articlesAdded: integer("articles_added").default(0),
   questionsAdded: integer("questions_added").default(0),

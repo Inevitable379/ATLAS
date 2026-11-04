@@ -5,13 +5,13 @@ import { startSession } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default function PracticeHub() {
-  const doms = db.select().from(domains).orderBy(domains.sortOrder).all();
-  const rows = db.select({
+export default async function PracticeHub() {
+  const doms = await db.select().from(domains).orderBy(domains.sortOrder);
+  const rows = await db.select({
     id: topics.id, name: topics.name, domain: topics.domainId, level: topicMastery.masteryLevel,
     total: topicMastery.totalAttempts, correct: topicMastery.correctAttempts,
     qCount: sql<number>`(SELECT COUNT(*) FROM questions q WHERE q.topic_id = ${topics.id})`,
-  }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId)).orderBy(topics.sortOrder).all();
+  }).from(topics).leftJoin(topicMastery, eq(topics.id, topicMastery.topicId)).orderBy(topics.sortOrder);
 
   return (
     <div className="space-y-8">

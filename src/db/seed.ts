@@ -1,4 +1,4 @@
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as s from "./schema";
 import { DOMAINS, TOPICS, QUESTIONS, SAMPLE_ARTICLES } from "./seed-data";
 
@@ -15,23 +15,23 @@ export const RSS_SOURCES = [
   ["The Wire", "https://thewire.in/feed", "society"],
 ] as const;
 
-export function seedIfEmpty(db: BetterSQLite3Database<typeof s>) {
-  if (db.select().from(s.domains).limit(1).all().length > 0) return;
-  db.transaction((tx) => {
-    tx.insert(s.domains).values(DOMAINS).run();
-    tx.insert(s.topics).values(TOPICS).run();
-    tx.insert(s.rssSources).values(RSS_SOURCES.map(([name, url, category]) => ({ name, url, category }))).run();
-    tx.insert(s.questions).values(QUESTIONS.map((q) => ({
+export async function seedIfEmpty(db: PostgresJsDatabase<typeof s>) {
+  const existing = await db.select({ id: s.domains.id }).from(s.domains).limit(1);
+  if (existing.length > 0) return;
+  await db.transaction(async (tx) => {
+    await tx.insert(s.domains).values(DOMAINS);
+    await tx.insert(s.topics).values(TOPICS);
+    await tx.insert(s.rssSources).values(RSS_SOURCES.map(([name, url, category]) => ({ name, url, category })));
+    await tx.insert(s.questions).values(QUESTIONS.map((q) => ({
       domainId: q.domain, topicId: q.topic, type: q.type, difficulty: q.difficulty,
       passageText: q.passage ?? null, questionText: q.q,
       options: q.options ? JSON.stringify(q.options) : null,
       correctAnswer: q.answer, explanation: q.explanation, source: "seed", verified: 1,
-    }))).run();
-    // Placeholder reading material so the loop works before RSS ingestion (Phase 2).
-    tx.insert(s.articles).values(SAMPLE_ARTICLES.map((a, i) => ({
+    })));
+    await tx.insert(s.articles).values(SAMPLE_ARTICLES.map((a, i) => ({
       title: a.title, url: `atlas://sample/${i + 1}`, sourceName: a.source, category: a.category,
       author: a.author, content: a.content,
       readingTimeMin: Math.max(1, Math.round(a.content.split(/\s+/).length / 200)),
-    }))).run();
+    })));
   });
 }

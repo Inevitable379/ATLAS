@@ -41,25 +41,25 @@ async function generateWithRetry(topic: typeof topics.$inferSelect, passage: str
   return result;
 }
 
-function unusedQuestionCount(topicId: string) {
-  return db.select({
+async function unusedQuestionCount(topicId: string) {
+  const rows = await db.select({
     count: sql<number>`coalesce(sum(case when ${attempts.id} is null then 1 else 0 end), 0)`,
   }).from(questions)
     .leftJoin(attempts, eq(attempts.questionId, questions.id))
-    .where(eq(questions.topicId, topicId))
-    .get()?.count ?? 0;
+    .where(eq(questions.topicId, topicId));
+  return rows[0]?.count ?? 0;
 }
 
-function existingQuestionTexts(topicId: string) {
+async function existingQuestionTexts(topicId: string) {
   return new Set(
-    db.select({ text: questions.questionText }).from(questions)
-      .where(eq(questions.topicId, topicId)).all()
+    (await db.select({ text: questions.questionText }).from(questions)
+      .where(eq(questions.topicId, topicId)))
       .map((question) => question.text.trim().toLowerCase()),
   );
 }
 
-function addQuestions(topic: typeof topics.$inferSelect, generated: GeneratedPracticeQuestion[], passage: typeof articles.$inferSelect | undefined) {
-  const existing = existingQuestionTexts(topic.id);
+async function addQuestions(topic: typeof topics.$inferSelect, generated: GeneratedPracticeQuestion[], passage: typeof articles.$inferSelect | undefined) {
+  const existing = await existingQuestionTexts(topic.id);
   const fresh = generated.filter((question) => {
     const key = question.question.trim().toLowerCase();
     if (existing.has(key)) return false;
@@ -68,7 +68,7 @@ function addQuestions(topic: typeof topics.$inferSelect, generated: GeneratedPra
   });
   if (!fresh.length) return 0;
 
-  db.insert(questions).values(fresh.map((question) => ({
+  await db.insert(questions).values(fresh.map((question) => ({
     domainId: topic.domainId,
     topicId: topic.id,
     articleId: passage?.id ?? null,
@@ -81,33 +81,40 @@ function addQuestions(topic: typeof topics.$inferSelect, generated: GeneratedPra
     explanation: question.explanation,
     source: "ai_generated",
     verified: 0,
-  }))).run();
+  })));
   return fresh.length;
 }
 
 async function main() {
   if (dryRun) {
-    const topicsToRefresh = db.select().from(topics).all()
-      .filter((topic) => unusedQuestionCount(topic.id) < MIN_UNUSED_QUESTIONS);
+    const allTopics = await db.select().from(topics);
+    const topicsToRefresh = [];
+    for (const topic of allTopics) {
+      if (await unusedQuestionCount(topic.id) < MIN_UNUSED_QUESTIONS) topicsToRefresh.push(topic);
+    }
     console.log(JSON.stringify({
       status: "dry_run",
       topics: topicsToRefresh.map((topic) => topic.name),
     }));
     return;
   }
-  const run = db.insert(automationRuns).values({ status: "running" })
-    .returning({ id: automationRuns.id }).get();
+  const [run] = await db.insert(automationRuns).values({ status: "running" })
+    .returning({ id: automationRuns.id });
   let articlesAdded = 0;
   let questionsAdded = 0;
   try {
     const feedResult = await refreshFeeds();
     articlesAdded = feedResult.added;
     const errors = feedResult.failures.map((failure) => `${failure.source}: ${failure.error}`);
-    const topicsToRefresh = db.select().from(topics).all()
-      .filter((topic) => unusedQuestionCount(topic.id) < MIN_UNUSED_QUESTIONS);
-    const latestArticle = db.select().from(articles)
+    const allTopics = await db.select().from(topics);
+    const topicsToRefresh = [];
+    for (const topic of allTopics) {
+      if (await unusedQuestionCount(topic.id) < MIN_UNUSED_QUESTIONS) topicsToRefresh.push(topic);
+    }
+    const latestArticleRows = await db.select().from(articles)
       .where(and(eq(articles.status, "unread"), sql`${articles.content} is not null`))
-      .orderBy(sql`${articles.discoveredAt} desc`).limit(1).get();
+      .orderBy(sql`${articles.discoveredAt} desc`).limit(1);
+    const latestArticle = latestArticleRows[0];
 
     for (const topic of topicsToRefresh) {
       const passage = topic.domainId === "varc" && topic.id === "inference" ? latestArticle : undefined;
@@ -117,16 +124,16 @@ async function main() {
         errors.push(`${topic.name}: ${result.error}`);
         continue;
       }
-      questionsAdded += addQuestions(topic, result.value, passage);
+      questionsAdded += await addQuestions(topic, result.value, passage);
     }
 
-    db.update(automationRuns).set({
+    await db.update(automationRuns).set({
       status: errors.length ? "completed_with_errors" : "completed",
       articlesAdded,
       questionsAdded,
       error: errors.length ? errors.join(" | ").slice(0, 500) : null,
-      finishedAt: sql`datetime('now')`,
-    }).where(eq(automationRuns.id, run.id)).run();
+      finishedAt: sql`CURRENT_TIMESTAMP`,
+    }).where(eq(automationRuns.id, run.id));
     console.log(JSON.stringify({
       status: errors.length ? "completed_with_errors" : "completed",
       articlesAdded,
@@ -135,13 +142,13 @@ async function main() {
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    db.update(automationRuns).set({
+    await db.update(automationRuns).set({
       status: "failed",
       articlesAdded,
       questionsAdded,
       error: message.slice(0, 500),
-      finishedAt: sql`datetime('now')`,
-    }).where(eq(automationRuns.id, run.id)).run();
+      finishedAt: sql`CURRENT_TIMESTAMP`,
+    }).where(eq(automationRuns.id, run.id));
     console.error(`ATLAS automation failed: ${message}`);
     process.exitCode = 1;
   }

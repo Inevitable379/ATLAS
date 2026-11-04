@@ -6,8 +6,8 @@ import ReviewClient from "./review-client";
 
 export const dynamic = "force-dynamic";
 
-export default function Vocabulary() {
-  const words = db.select().from(vocabulary).orderBy(desc(vocabulary.id)).all();
+export default async function Vocabulary() {
+  const words = await db.select().from(vocabulary).orderBy(desc(vocabulary.id));
   const due = words.filter((word) => !word.nextReviewDate || word.nextReviewDate <= today());
   const cards = due.map((word) => ({
     id: word.id,

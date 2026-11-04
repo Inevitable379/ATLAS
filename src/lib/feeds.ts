@@ -98,8 +98,9 @@ async function refreshSource(source: typeof rssSources.$inferSelect): Promise<Fe
       continue;
     }
 
-    const existing = db.select({ id: articles.id }).from(articles)
-      .where(and(eq(articles.url, url), eq(articles.sourceName, source.name))).get();
+    const existingRows = await db.select({ id: articles.id }).from(articles)
+      .where(and(eq(articles.url, url), eq(articles.sourceName, source.name))).limit(1);
+    const existing = existingRows[0];
     if (existing) {
       skipped += 1;
       continue;
@@ -109,7 +110,7 @@ async function refreshSource(source: typeof rssSources.$inferSelect): Promise<Fe
     if (extracted.error) fallbacks += 1;
     const content = extracted.article?.content || fallbackText(item) || null;
     const readingTimeMin = content ? Math.max(1, Math.round(content.split(/\s+/).length / 200)) : 5;
-    const result = db.insert(articles).values({
+    const result = await db.insert(articles).values({
       title,
       url,
       sourceName: source.name,
@@ -117,19 +118,19 @@ async function refreshSource(source: typeof rssSources.$inferSelect): Promise<Fe
       author: extracted.article?.author ?? item.creator ?? item.author ?? null,
       content,
       readingTimeMin,
-    }).onConflictDoNothing({ target: articles.url }).run();
+    }).onConflictDoNothing({ target: articles.url }).returning({ id: articles.id });
 
-    if (result.changes > 0) added += 1;
+    if (result.length > 0) added += 1;
     else skipped += 1;
   }
 
-  db.update(rssSources).set({ lastFetched: new Date().toISOString() })
-    .where(eq(rssSources.id, source.id)).run();
+  await db.update(rssSources).set({ lastFetched: new Date().toISOString() })
+    .where(eq(rssSources.id, source.id));
   return { source: source.name, added, skipped, fallbacks };
 }
 
 export async function refreshFeeds(): Promise<FeedRefreshResult> {
-  const sources = db.select().from(rssSources).where(eq(rssSources.isActive, 1)).all();
+  const sources = await db.select().from(rssSources).where(eq(rssSources.isActive, 1));
   const results = await Promise.all(sources.map(async (source) => {
     try {
       return await refreshSource(source);

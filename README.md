@@ -22,11 +22,11 @@ ATLAS is a local-first CAT preparation workspace. The current Phase 1 implementa
 - Settings page with Ollama model selection, health check, and database download.
 - RSS refresh with deduplication, readable article extraction, and searchable archive.
 - A scheduled automation worker that refreshes feeds daily and grows low-inventory practice topics without deleting attempts or history.
-- A local SQLite database (`atlas.db`) created and seeded automatically on first run.
+- A Supabase PostgreSQL database created and seeded automatically on first server start.
 
-No external services or AI providers are required for the core reading/practice loop. For local AI, install Ollama separately, pull a small model such as `qwen2.5:3b`, start Ollama, then check it from `/settings`. The database is intentionally easy to back up: use the download button or copy `atlas.db` while the app is stopped.
+The core reading/practice loop requires the configured Supabase database. For local AI, install Ollama separately, pull a small model such as `qwen2.5:3b`, start Ollama, then check it from `/settings`.
 
-For Gemini, copy `.env.example` to `.env.local`, add a key created in [Google AI Studio](https://aistudio.google.com/apikey), and restart the server. ATLAS sends only the article passage or selected vocabulary context to Gemini; the key is never stored in SQLite or exposed to the browser.
+For local development, copy `.env.example` to `.env.local`, add the Supabase `DATABASE_URL`, add a key created in [Google AI Studio](https://aistudio.google.com/apikey), and restart the server. ATLAS sends only the article passage or selected vocabulary context to Gemini; neither the database password nor API key is exposed to the browser.
 
 ## Commands
 
@@ -39,7 +39,7 @@ npm run seed      # Create the database and seed it if empty
 npm run automate  # Refresh feeds and replenish low-inventory practice topics once
 ```
 
-Delete `atlas.db` to reset local data. The project requires Node 18.18+; `better-sqlite3` may compile a native binary during installation.
+The project requires Node 18.18+. Supabase tables and seed data are created automatically when `DATABASE_URL` is configured.
 
 ## Daily automation
 
@@ -51,7 +51,7 @@ The automation is intentionally a one-shot worker so it is safe to run from Wind
 4. Retries temporary Gemini failures after 15 seconds, 1 minute, and 3 minutes.
 5. Keeps every existing question and attempt; new questions are appended to the rolling pool.
 
-To schedule it on Windows, open **Task Scheduler**, create a basic daily task, choose a time when the computer is on, and set the action to start `npm` with argument `run automate`. Set **Start in** to the ATLAS repository directory. The task must run from the repository directory so it can load `.env.local` and `atlas.db`.
+To schedule it on Windows, open **Task Scheduler**, create a basic daily task, choose a time when the computer is on, and set the action to start `npm` with argument `run automate`. Set **Start in** to the ATLAS repository directory. The task must run from the repository directory so it can load `.env.local` and connect to Supabase.
 
 The worker does not retry forever or bypass quotas. If Gemini is busy or unavailable, RSS refresh still completes and the run records `completed_with_errors`; the next scheduled run tries again.
 

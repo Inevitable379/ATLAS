@@ -16,13 +16,13 @@ export default async function Archive({ searchParams }: { searchParams: Promise<
   const query = await searchParams;
   const search = first(query.q)?.trim().slice(0, 100) ?? "";
   const category = first(query.category) ?? "";
-  const rows = db.select().from(articles)
+  const rows = await db.select().from(articles)
     .where(and(
       search ? like(articles.title, `%${search}%`) : undefined,
       category ? eq(articles.category, category) : undefined,
     ))
     .orderBy(desc(articles.discoveredAt), desc(articles.id))
-    .all();
+    ;
 
   return (
     <div className="space-y-6">
