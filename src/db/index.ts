@@ -11,6 +11,7 @@ const connectionString = process.env.DATABASE_URL?.trim();
 
 const client = postgres(connectionString ?? "postgres://build:build@localhost:5432/build", {
   prepare: false,
+  ssl: connectionString ? "require" : false,
   max: 1,
   idle_timeout: 20,
 });
