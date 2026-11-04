@@ -3,7 +3,6 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
 import * as schema from "./schema";
-import { DDL } from "./ddl";
 import { seedIfEmpty } from "./seed";
 
 loadEnvConfig(process.cwd());
@@ -24,8 +23,13 @@ export async function ensureDatabase() {
     throw new Error("DATABASE_URL is required. Add the Supabase connection string to .env.local and Vercel.");
   }
   initialization ??= (async () => {
-    for (const statement of DDL.split(";").map((part) => part.trim()).filter(Boolean)) {
-      await database.execute(sql.raw(statement));
+    try {
+      await database.execute(sql`SELECT 1 FROM domains LIMIT 1`);
+    } catch (error) {
+      throw new Error(
+        "ATLAS database tables are missing. Run the PostgreSQL setup SQL in Supabase before opening the app.",
+        { cause: error },
+      );
     }
     await seedIfEmpty(database);
   })().catch((error) => {

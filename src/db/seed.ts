@@ -1,4 +1,5 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { sql } from "drizzle-orm";
 import * as s from "./schema";
 import { DOMAINS, TOPICS, QUESTIONS, SAMPLE_ARTICLES } from "./seed-data";
 
@@ -16,9 +17,10 @@ export const RSS_SOURCES = [
 ] as const;
 
 export async function seedIfEmpty(db: PostgresJsDatabase<typeof s>) {
-  const existing = await db.select({ id: s.domains.id }).from(s.domains).limit(1);
-  if (existing.length > 0) return;
   await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('atlas-seed'))`);
+    const existing = await tx.select({ id: s.domains.id }).from(s.domains).limit(1);
+    if (existing.length > 0) return;
     await tx.insert(s.domains).values(DOMAINS);
     await tx.insert(s.topics).values(TOPICS);
     await tx.insert(s.rssSources).values(RSS_SOURCES.map(([name, url, category]) => ({ name, url, category })));

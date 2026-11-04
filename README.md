@@ -22,7 +22,7 @@ ATLAS is a local-first CAT preparation workspace. The current Phase 1 implementa
 - Settings page with Ollama model selection, health check, and database download.
 - RSS refresh with deduplication, readable article extraction, and searchable archive.
 - A scheduled automation worker that refreshes feeds daily and grows low-inventory practice topics without deleting attempts or history.
-- A Supabase PostgreSQL database created and seeded automatically on first server start.
+- A Supabase PostgreSQL database seeded automatically after its tables are created in Supabase.
 
 The core reading/practice loop requires the configured Supabase database. For local AI, install Ollama separately, pull a small model such as `qwen2.5:3b`, start Ollama, then check it from `/settings`.
 
@@ -39,7 +39,7 @@ npm run seed      # Create the database and seed it if empty
 npm run automate  # Refresh feeds and replenish low-inventory practice topics once
 ```
 
-The project requires Node 18.18+. Supabase tables and seed data are created automatically when `DATABASE_URL` is configured.
+The project requires Node 18.18+. Before the first deployment, run the PostgreSQL statements in [`src/db/ddl.ts`](./src/db/ddl.ts) in the Supabase SQL Editor. After that, ATLAS seeds the initial data automatically when `DATABASE_URL` is configured. Runtime requests do not create tables, avoiding schema-lock waits on pooled serverless connections.
 
 ## Daily automation
 
