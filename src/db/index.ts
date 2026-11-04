@@ -13,6 +13,7 @@ const client = postgres(connectionString ?? "postgres://build:build@localhost:54
   ssl: connectionString ? "require" : false,
   max: 1,
   connect_timeout: 10,
+  queue_timeout: 5,
   idle_timeout: 20,
 });
 const database = drizzle(client, { schema });
