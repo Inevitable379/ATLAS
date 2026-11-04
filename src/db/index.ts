@@ -31,12 +31,16 @@ export async function ensureDatabase() {
         { cause: error },
       );
     }
-    await seedIfEmpty(database);
   })().catch((error) => {
     initialization = undefined;
     throw error;
   });
   await initialization;
+}
+
+export async function seedDatabase() {
+  await ensureDatabase();
+  await seedIfEmpty(database);
 }
 
 export const db = database;

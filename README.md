@@ -39,7 +39,7 @@ npm run seed      # Create the database and seed it if empty
 npm run automate  # Refresh feeds and replenish low-inventory practice topics once
 ```
 
-The project requires Node 18.18+. Before the first deployment, run the PostgreSQL statements in [`src/db/ddl.ts`](./src/db/ddl.ts) in the Supabase SQL Editor. After that, ATLAS seeds the initial data automatically when `DATABASE_URL` is configured. Runtime requests do not create tables, avoiding schema-lock waits on pooled serverless connections.
+The project requires Node 18.18+. Before the first deployment, run the PostgreSQL statements in [`src/db/ddl.ts`](./src/db/ddl.ts) in the Supabase SQL Editor, then run `npm run seed` once with the same `DATABASE_URL`. Runtime requests only verify the tables and never create or seed them, avoiding schema-lock waits on pooled serverless connections.
 
 ## Daily automation
 

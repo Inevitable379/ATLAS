@@ -1,4 +1,11 @@
-import { ensureDatabase } from "../src/db";
+import { seedDatabase } from "../src/db";
 
-await ensureDatabase();
-console.log("ATLAS database ready (Supabase PostgreSQL).");
+async function main() {
+  await seedDatabase();
+  console.log("ATLAS database ready (Supabase PostgreSQL).");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
