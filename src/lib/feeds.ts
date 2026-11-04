@@ -1,5 +1,5 @@
 import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { parseHTML } from "linkedom";
 import Parser from "rss-parser";
 import { and, eq } from "drizzle-orm";
 import { db, ensureDatabase } from "@/db";
@@ -68,8 +68,8 @@ function fallbackText(item: FeedItem) {
 async function extractArticle(url: string) {
   try {
     const html = await fetchText(url);
-    const dom = new JSDOM(html, { url });
-    const parsed = new Readability(dom.window.document).parse();
+    const { document } = parseHTML(html);
+    const parsed = new Readability(document).parse();
     if (!parsed?.textContent?.trim()) return { article: null, error: "No readable article content found" };
     const content = parsed.textContent
       .replace(/\r/g, "")

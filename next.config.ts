@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["jsdom", "@mozilla/readability", "rss-parser"],
+  serverExternalPackages: ["@mozilla/readability", "rss-parser", "linkedom"],
   turbopack: {
     root: process.cwd(),
     rules: {
