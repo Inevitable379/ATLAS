@@ -13,6 +13,7 @@ const client = postgres(connectionString ?? "postgres://build:build@localhost:54
   prepare: false,
   ssl: connectionString ? "require" : false,
   max: 1,
+  connect_timeout: 10,
   idle_timeout: 20,
 });
 const database = drizzle(client, { schema });
@@ -23,9 +24,14 @@ export async function ensureDatabase() {
     throw new Error("DATABASE_URL is required. Add the Supabase connection string to .env.local and Vercel.");
   }
   initialization ??= (async () => {
-    await database.execute(sql.raw(DDL));
+    for (const statement of DDL.split(";").map((part) => part.trim()).filter(Boolean)) {
+      await database.execute(sql.raw(statement));
+    }
     await seedIfEmpty(database);
-  })();
+  })().catch((error) => {
+    initialization = undefined;
+    throw error;
+  });
   await initialization;
 }
 
